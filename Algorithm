@@ -1,0 +1,21 @@
+Initialize three semaphores, one for each ingredient (tobacco, paper, matches), with an initial value of 0.
+
+Initialize a semaphore for the table, with an initial value of 1 (to represent that the table is initially empty).
+
+Create three producer threads, each responsible for producing two of the three ingredients required for smoking.
+Each producer thread runs an infinite loop:
+Wait on the two semaphores corresponding to the ingredients it produces 
+(e.g. the producer thread responsible for tobacco and paper waits on the tobacco and paper semaphores).
+Acquire the table semaphore.
+Put the two ingredients on the table.
+Release the table semaphore.
+
+Create a smoker thread for each ingredient. Each smoker thread runs an infinite loop:
+Wait on the semaphore corresponding to its missing ingredient (e.g. the smoker thread waiting for matches waits on the matches semaphore).
+Acquire the table semaphore.
+Take the two ingredients it needs from the table.
+Release the table semaphore.
+Smoke the cigarette.
+Signal the semaphore corresponding to the ingredient it just used (e.g. the smoker thread that used matches signals the matches semaphore).
+
+Start all threads.
