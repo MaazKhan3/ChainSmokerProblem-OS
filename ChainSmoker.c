@@ -1,278 +1,118 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
+#include <semaphore.h>
 #include <unistd.h>
 
-#define N_ITERATIONS 3
-
-int ingredients[3] = {0, 0, 0};
-
-pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t tobacco_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t paper_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t matches_cond = PTHREAD_COND_INITIALIZER;
-pthread_cond_t agent_cond = PTHREAD_COND_INITIALIZER;
-
-
-
-// function for agent thread 1
-
-void* agent_thread1(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[0] != 0 || ingredients[1] != 0) {
-
-            pthread_cond_wait(&agent_cond, &mutex);
-
-        }
-
-        ingredients[0] = 1; // tobacco
-
-        ingredients[1] = 1; // paper
-
-        printf("Agent 1 produced tobacco and paper\n");
-
-        pthread_cond_signal(&tobacco_cond);
-
-        pthread_cond_signal(&paper_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-// function for agent thread 2
-
-void* agent_thread2(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[1] != 0 || ingredients[2] != 0) {
-
-            pthread_cond_wait(&agent_cond, &mutex);
-
-        }
-
-        ingredients[1] = 1; // paper
-
-        ingredients[2] = 1; // matches
-
-        printf("Agent 2 produced paper and matches\n");
-
-        pthread_cond_signal(&paper_cond);
-
-        pthread_cond_signal(&matches_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-// function for agent thread 3
-
-void* agent_thread3(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[0] != 0 || ingredients[2] != 0) {
-
-            pthread_cond_wait(&agent_cond, &mutex);
-
-        }
-
-        ingredients[0] = 1; // tobacco
-
-        ingredients[2] = 1; // matches
-
-        printf("Agent 3 produced tobacco and matches\n");
-
-        pthread_cond_signal(&matches_cond);
-
-        pthread_cond_signal(&tobacco_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-// function for smoker with tobacco
-
-void* smoker_tobacco(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[0] != 1) {
-
-            pthread_cond_wait(&tobacco_cond, &mutex);
-
-        }
-
-        ingredients[0] = 0;
-
-        printf("Smoker with tobacco is smoking\n");
-
-        usleep(500);
-
-        pthread_cond_signal(&agent_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-// function for smoker with paper
-
-void* smoker_paper(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[1] != 1) {
-
-            pthread_cond_wait(&paper_cond, &mutex);
-
-        }
-
-        ingredients[1] = 0;
-
-        pthread_cond_signal(&agent_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-        printf("Smoker with paper is smoking\n");
-
-        sleep(1);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-// function for smoker with matches
-
-void* smoker_matches(void* arg) {
-
-    int i;
-
-    for (i = 0; i < N_ITERATIONS; i++) {
-
-        pthread_mutex_lock(&mutex);
-
-        while (ingredients[2] != 1) {
-
-            pthread_cond_wait(&matches_cond, &mutex);
-
-        }
-
-        ingredients[2] = 0;
-
-        pthread_cond_signal(&agent_cond);
-
-        pthread_mutex_unlock(&mutex);
-
-        printf("Smoker with matches is smoking\n");
-
-        sleep(1);
-
-    }
-
-    return NULL;
-
-}
-
-
-
-int main() {
-
-    pthread_t smoker1, smoker2, smoker3, agent1, agent2, agent3;
-
-    pthread_mutex_init(&mutex, NULL);
-
-    pthread_cond_init(&tobacco_cond, NULL);
-
-    pthread_cond_init(&paper_cond, NULL);
-
-    pthread_cond_init(&matches_cond, NULL);
-
-    pthread_cond_init(&agent_cond, NULL);
-
-    pthread_create(&smoker1, NULL, smoker_tobacco, NULL);
-
-    pthread_create(&smoker2, NULL, smoker_paper, NULL);
-
-    pthread_create(&smoker3, NULL, smoker_matches, NULL);
-
-    pthread_create(&agent1, NULL, agent_thread1, NULL);
-
-    pthread_create(&agent2, NULL, agent_thread2, NULL);
-
-    pthread_create(&agent3, NULL, agent_thread3, NULL);
-
-    pthread_join(smoker1, NULL);
-
-    pthread_join(smoker2, NULL);
-
-    pthread_join(smoker3, NULL);
-
-    pthread_join(agent1, NULL);
-
-    pthread_join(agent2, NULL);
-
-    pthread_join(agent3, NULL);
-
-    pthread_mutex_destroy(&mutex);
-
-    pthread_cond_destroy(&tobacco_cond);
-
-    pthread_cond_destroy(&paper_cond);
-
-    pthread_cond_destroy(&matches_cond);
-
-    pthread_cond_destroy(&agent_cond);
+#define NUM_SMOKERS 3
+
+sem_t tobacco_paper;
+sem_t paper_matches;
+sem_t matches_tobacco;
+sem_t agent;
+
+void* tobacco_smoker(void* arg);
+void* paper_smoker(void* arg);
+void* matches_smoker(void* arg);
+void* tobacco_supplier(void* arg);
+
+int main()
+{
+    pthread_t smokers[NUM_SMOKERS];
+    pthread_t supplier;
+
+    // Initialize semaphores
+    sem_init(&tobacco_paper, 0, 0);
+    sem_init(&paper_matches, 0, 0);
+    sem_init(&matches_tobacco, 0, 0);
+    sem_init(&agent, 0, 1);
+
+    // Create threads
+    
+    pthread_create(&supplier, NULL, tobacco_supplier, NULL);
+    pthread_create(&smokers[0], NULL, tobacco_smoker, NULL);
+    pthread_create(&smokers[1], NULL, paper_smoker, NULL);
+    pthread_create(&smokers[2], NULL, matches_smoker, NULL);
+
+    // Wait for threads to finish
+    pthread_join(smokers[0], NULL);
+    pthread_join(smokers[1], NULL);
+    pthread_join(smokers[2], NULL);
+    pthread_join(supplier, NULL);
+
+    // Destroy semaphores
+    sem_destroy(&tobacco_paper);
+    sem_destroy(&paper_matches);
+    sem_destroy(&matches_tobacco);
+    sem_destroy(&agent);
 
     return 0;
+}
 
+void* tobacco_smoker(void* arg)
+{
+    while (1) {
+        // Wait for paper and matches to be put on the table
+        
+		sem_wait(&paper_matches);
+//        sem_wait(&matches);
+        
+        printf("Tobacco smoker picked up paper and matches and is smoking\n");
+        sleep(1); // smoking time
+        sem_post(&agent); // signal agent that smoking is finished
+    }
+}
+
+void* paper_smoker(void* arg)
+{
+    while (1) {
+        // Wait for tobacco and matches to be put on the table
+        sem_wait(&matches_tobacco);
+        //sem_wait(&matches);
+        printf("Paper smoker picked up tobacco and matches and is smoking\n");
+        sleep(1); // smoking time
+        sem_post(&agent); // signal agent that smoking is finished
+    }
+}
+
+void* matches_smoker(void* arg)
+{
+    while (1) {
+        // Wait for tobacco and paper to be put on the table
+        sem_wait(&tobacco_paper);
+        //sem_wait(&paper);
+        printf("Matches smoker picked up tobacco and paper and is smoking\n");
+        sleep(1); // smoking time
+        sem_post(&agent); // signal agent that smoking is finished
+    }
+}
+
+void* tobacco_supplier(void* arg)
+{
+	
+	int choice = 0, x;
+    while (1) {
+        // Wait for the smokers to finish smoking
+        sem_wait(&agent);
+
+        // Randomly choose two ingredients to put on the table
+    x = choice;
+	while(choice==x){
+	
+		choice = rand() % 3;
+	}
+        if (choice == 0) {
+            sem_post(&paper_matches);
+//            sem_post(&matches);
+            printf("\nThread 3 supplier put paper and matches on the table\n");
+        } else if (choice == 1) {
+            sem_post(&matches_tobacco);
+//            sem_post(&matches);
+            printf("\nThread 2 supplier put tobacco and matches on the table\n");
+        } else {
+            sem_post(&tobacco_paper);
+//            sem_post(&paper);
+            printf("\nThread 1 supplier put tobacco and paper on the table\n");
+        }
+    }
 }
